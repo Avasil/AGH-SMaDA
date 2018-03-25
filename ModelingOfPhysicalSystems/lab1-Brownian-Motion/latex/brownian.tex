@@ -102,7 +102,7 @@ Above code has been executed for different number of dimensions and number of pa
 
 \begin{figure}[H]
 	\centering
-	\includegraphics[width=1.3\textwidth]{mean_squared}
+	\makebox[0pt]{\includegraphics[width=1.45\textwidth]{mean_squared}}
 	\caption{Mean squared displacement for Brownian motion.}
 \end{figure}
 
@@ -126,6 +126,7 @@ function [] = self_similarity()
 	grid on;
 	xlabel('x coordinate');
 	ylabel('autocorrelation');
+	title('Random distribution');
 
 	x = 0;
 
@@ -146,6 +147,7 @@ function [] = self_similarity()
 	grid on;
 	xlabel('x coordinate');
 	ylabel('autocorrelation');
+	title('Brownian motion');
 end
 \end{lstlisting}
 
@@ -153,11 +155,11 @@ This results in following plot:
 
 \begin{figure}[H]
 	\centering
-	\includegraphics[width=1.2\textwidth]{auto_corr}
+	\makebox[0pt]{\includegraphics[width=1.4\textwidth]{auto_corr}}
 	\caption{Auto-correlation for random distribution and Brownian motion.}
 \end{figure}
 
-In case of random values, the correlation factor is close to zero for most of the input. This is not the case with Brownian motion where it does not go below 0.86.
+In case of random values, the correlation factor is close to zero for most of the input. This is not the case with Brownian motion where it does not go below 0.88.
 
 \subsection{Evolution of particles density}
 
@@ -189,17 +191,81 @@ function [] = particles_density(dims, timesteps, nparts)
 end
 \end{lstlisting}
 
+Next, the function is executed for both one and two dimensions.
+
 \begin{figure}[H]
 	\centering
-	\includegraphics[width=1.2\textwidth]{particles_density}
+	\makebox[0pt]{\includegraphics[width=1.4\textwidth]{particles_density}}
 	\caption{Time evolution of particles density.}
 \end{figure}
 
-Looking at the figure above we notice that it looks like \textit{Gaussian Distribution}.
+Looking at the figure above we notice that it looks like \textit{Gaussian Distribution} regardless of number of dimensions.
 
 
 \section{Conclusion}
 
-During this laboratory we have implemented Brownian motion in MATLAB using Monte Carlo method for acquiring random data. We have shown its \textit{self-similarity} property despite being random motion manifesting \textit{Gaussian Distribution}. That fact makes it unique among all the others Gaussian processes.
+During this laboratory we have implemented Brownian motion in MATLAB using Monte Carlo method for acquiring random data. We have shown its \textit{self-similarity} property despite being random motion manifesting \textit{Gaussian Distribution} which is very interesting characteristic.
+
+\subsection{Source code}
+
+Source code using listed functions for drawing figures can be found below:
+
+\begin{lstlisting}[language=Matlab, caption = {Source code used for drawing pictures used in this report.}]
+clear; clc;
+
+figure;
+subplot(1, 2, 1);
+brownian(1, 1000);
+title('1 trajectory');
+grid on;
+
+subplot(1, 2, 2);
+brownian(3, 1000);
+title('3 trajectories');
+grid on;
+
+figure;
+self_similarity();
+
+figure;
+subplot(3, 2, 1);
+mean_square(1, 50, 50);
+grid on;
+title('1 dimension');
+subplot(3, 2, 2);
+mean_square(1, 1000, 1000);
+grid on;
+title('1 dimension');
+
+subplot(3, 2, 3);
+mean_square(2, 50, 50);
+grid on;
+title('2 dimensions');
+subplot(3, 2, 4);
+mean_square(2, 1000, 1000);
+grid on;
+title('2 dimensions');
+
+subplot(3, 2, 5);
+mean_square(3, 50, 50);
+grid on;
+title('3 dimensions');
+
+subplot(3, 2, 6);
+mean_square(3, 1000, 1000);
+grid on;
+title('3 dimensions');
+
+figure;
+subplot(1, 2, 1);
+particles_density(1, 100, 1000);
+grid on;
+title('1 dimension');
+subplot(1, 2, 2);
+particles_density(2, 100, 1000);
+title('2 dimensions');
+grid on;
+\end{lstlisting}
+
 
 \end{document}
