@@ -2,22 +2,25 @@ import breeze.linalg.{DenseMatrix, DenseVector}
 import breeze.stats.distributions.Rand
 import cats.effect.IO
 
+import scala.annotation.tailrec
+
 package object neuralnetwork {
 
-  def loadInputs(path: String, delimiter: String): IO[List[(DenseVector[Double], DenseVector[Double])]] = IO {
-    val bufferedSource = io.Source.fromFile(path)
+  final case class ValidationResult(successRate: Double)
 
-    val inputs: List[(DenseVector[Double], DenseVector[Double])] = (for {
-      line <- bufferedSource.getLines
-    } yield {
-      val splitted = line.split(delimiter).map(_.trim)
-      val (features, target) = (splitted.dropRight(1).map(_.toDouble), targetToDouble(splitted.last))
-      (DenseVector(features), target)
-    }).toList
-    bufferedSource.close()
+  final case class InputData(features: DenseVector[Double], target: DenseVector[Double])
 
-    inputs
-  }
+  final def loadInputs(path: String, delimiter: String): IO[List[InputData]] =
+    IO(io.Source.fromFile(path)).bracket { in =>
+      IO {
+        val data = for (line <- in.getLines) yield {
+          val splitted = line.split(delimiter).map(_.trim)
+          val (features, target) = (splitted.dropRight(1).map(_.toDouble), targetToDouble(splitted.last))
+          InputData(DenseVector(features), target)
+        }
+        scala.util.Random.shuffle(data.toList)
+      }
+    }(in => IO(in.close()))
 
   private def targetToDouble(s: String): DenseVector[Double] = s match {
     case "Iris-setosa" => DenseVector(1, 0, 0)
@@ -25,35 +28,71 @@ package object neuralnetwork {
     case "Iris-virginica" => DenseVector(0, 0, 1)
   }
 
-  private def targetFromDouble(s: DenseVector[Double]): String = s.data match {
-    case Array(1, 0, 0) => "Iris-setosa"
-    case Array(0, 1, 0) => "Iris-versicolor"
-    case Array(0, 0, 1) => "Iris-virginica"
+  final def targetFromDouble(s: DenseVector[Double]): String = s.data match {
+    case Array(x, y, z) if x > y && x > z => "Iris-setosa"
+    case Array(x, y, z) if y > z && y > x => "Iris-versicolor"
+    case _ => "Iris-virginica"
   }
 
-  def validateOutput(v: DenseVector[Double], target: DenseVector[Double]): String = {
-    val result = s" <=> ${targetFromDouble(target)}"
-    val dobrzeNiedobrze = (s: String) => " WHICH IS..." + (if (s == targetFromDouble(target)) "DOBRZE !!!! :O" else "NIEDOBRZE :(")
-    v.data match {
-      case Array(x, y, z) if x > y && x > z => "Iris-setosa" + result + dobrzeNiedobrze("Iris-setosa")
-      case Array(x, y, z) if y > z && y > x => "Iris-versicolor" + result + dobrzeNiedobrze("Iris-versicolor")
-      case _ => "Iris-virginica" + result + dobrzeNiedobrze("Iris-virginica")
-    }
-  }
-
-  def judge(v: DenseVector[Double], target: DenseVector[Double]): Boolean = {
-    val dobrzeNiedobrze = (s: String) => s == targetFromDouble(target)
+  final def isCorrect(v: DenseVector[Double], target: DenseVector[Double]): Boolean = {
+    val compareToExpected = (s: String) => s == targetFromDouble(target)
 
     v.data match {
-      case Array(x, y, z) if x > y && x > z => dobrzeNiedobrze("Iris-setosa")
-      case Array(x, y, z) if y > z && y > x => dobrzeNiedobrze("Iris-versicolor")
-      case _ => dobrzeNiedobrze("Iris-virginica")
+      case Array(x, y, z) if x > y && x > z => compareToExpected("Iris-setosa")
+      case Array(x, y, z) if y > z && y > x => compareToExpected("Iris-versicolor")
+      case _ => compareToExpected("Iris-virginica")
     }
   }
 
   // n = inputs
   // m = neurons
-  def initializeWeights(n: Int, m: Int): DenseMatrix[Double] = {
+  final def initializeWeights(n: Int, m: Int): DenseMatrix[Double] = {
     DenseMatrix.rand(n, m, Rand.gaussian(0.0, 1.5))
   }
+
+  @tailrec
+  final def iterate(inputData: List[InputData], bpNet: BackpropNet, n: Int): BackpropNet = {
+    if (n > 0) {
+      val backpropagatedNet = inputData.foldLeft(bpNet) { case (backPropNet, InputData(features, target)) =>
+        val propagatedNet: List[PropagatedLayer] =
+          PropagatedLayer.propagateNet(features, backPropNet)
+
+        BackpropNet(BackpropagatedLayer
+          .backpropagateNet(target, propagatedNet)
+          .map(BackpropagatedLayer.updateWeights(backPropNet.learningRate, _)), backPropNet.learningRate)
+      }
+
+      iterate(inputData, backpropagatedNet, n - 1)
+    } else bpNet
+  }
+
+  final case class KFoldResult(trainedNet: BackpropNet)
+
+  final def kFoldCrossValidation(k: Int, n: Int, inputs: List[InputData], bpNet: BackpropNet): KFoldResult = {
+    val size = inputs.length
+    val chunks = size / k
+
+    val parts: List[List[InputData]] = inputs.grouped(chunks).toList
+
+    @tailrec
+    def iteration(iter: Int, backPropNet: BackpropNet): KFoldResult = {
+      if (iter == k - 1) {
+        val learningInputs = parts.slice(0, iter).foldLeft(List.empty[InputData])(_ ++ _)
+        val newBpNet = iterate(learningInputs, backPropNet, n)
+
+        KFoldResult(newBpNet)
+      } else if (iter == 1) {
+        val learningInputs = parts.slice(1, k).foldLeft(List.empty[InputData])(_ ++ _)
+        val newBpNet = iterate(learningInputs, backPropNet, n)
+        iteration(iter + 1, newBpNet)
+      } else {
+        val learningInputs = (parts.slice(0, iter) ++ parts.slice(iter + 1, k)).foldLeft(List.empty[InputData])(_ ++ _)
+        val newBpNet = iterate(learningInputs, backPropNet, n)
+        iteration(iter + 1, newBpNet)
+      }
+    }
+
+    iteration(0, bpNet)
+  }
+
 }

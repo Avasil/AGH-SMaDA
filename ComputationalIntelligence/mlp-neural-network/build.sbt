@@ -13,7 +13,7 @@ val breeze = Seq(
 )
 
 val fp = Seq(
-  "org.typelevel" %% "cats-effect" % "0.10"
+  "org.typelevel" %% "cats-effect" % "1.0.0-RC2"
 )
 
 libraryDependencies  ++= breeze ++ fp

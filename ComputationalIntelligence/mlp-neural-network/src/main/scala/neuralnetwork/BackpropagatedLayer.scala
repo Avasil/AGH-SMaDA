@@ -66,11 +66,6 @@ object BackpropagatedLayer {
     val delW = learningRate *:* backpropagatedLayer.bpErrGrad
     val wNew = wOld -:- delW
 
-//    println("errGrad:\n" + backpropagatedLayer.bpErrGrad)
-//    println("wOld:\n" + wOld)
-//    println("delW:\n" + delW)
-//    println("wNew:\n" + wNew)
-
     Layer(wNew, backpropagatedLayer.activationFunc)
   }
 }

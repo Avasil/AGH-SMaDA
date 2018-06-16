@@ -15,7 +15,12 @@ final case class PropagatedLayer(
                                   // the weights for this layer, rows - number of inputs, cols - number of neurons
                                   weights: DenseMatrix[Double],
                                   activationFunc: ActivationSpec
-                                ) extends PropagatedLayerSpec
+                                ) extends PropagatedLayerSpec {
+
+  def validateResult(target: DenseVector[Double]) = {
+    isCorrect(output, target)
+  }
+}
 
 object PropagatedLayer {
   private def propagate(propLayer: PropagatedLayerSpec, layer: Layer): PropagatedLayer = {
@@ -34,7 +39,7 @@ object PropagatedLayer {
     val layer0 = PropagatedSensorLayer(input) // validateInput(input, net)
     val calcs = net.layers.scanLeft(layer0: PropagatedLayerSpec)(propagate)
 
-    // HList
+    // HList?
     calcs.tail collect { case x: PropagatedLayer => x }
   }
 }
