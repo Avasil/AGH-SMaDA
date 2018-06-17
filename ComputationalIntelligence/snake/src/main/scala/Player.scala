@@ -1,17 +1,118 @@
-import java.util.concurrent.atomic.AtomicReference
+import breeze.linalg.DenseVector
+import cats.data.NonEmptyList
+import javafx.scene.input.KeyCode.{A, D, S, W}
+import javafx.scene.input.KeyEvent
+import org.deeplearning4j.nn.multilayer.MultiLayerNetwork
+import org.nd4j.linalg.factory.Nd4j
 
-import scalafx.scene.Scene
+import scala.collection.immutable
 
 trait Player {
-  def chooseDirection(): Unit
+  var currentDirection: Direction
+
+  def chooseDirection(currentState: CurrentState): Direction
+
+  def onKeyPressed(event: KeyEvent): Unit
+
+  def gameFinished(currentState: CurrentState): Boolean
+
 }
 
 object Player {
-  def humanPlayer(scene: Scene, currentDirection: AtomicReference[Direction]) = new Player {
-    override def chooseDirection(): Unit = {
-???
+  def humanPlayer(initialDirection: Direction): Player = new Player with NNUtilities {
+
+    override var currentDirection: Direction = initialDirection
+
+    override def chooseDirection(currentState: CurrentState): Direction = {
+      println(genCurrentObservation(currentState.snake, currentState.food))
+      println(getFoodDistance(currentState.snake.head, currentState.food))
+      currentDirection
+    }
+
+    override def onKeyPressed(event: KeyEvent): Unit = {
+      event.getCode match {
+        case W if currentDirection != DOWN => currentDirection = UP
+        case S if currentDirection != UP => currentDirection = DOWN
+        case A if currentDirection != RIGHT => currentDirection = LEFT
+        case D if currentDirection != LEFT => currentDirection = RIGHT
+        case _ =>
+      }
+    }
+
+    override def gameFinished(currentState: CurrentState): Boolean = {
+      currentDirection = initialDirection
+      true
+    }
+  }
+
+  final case class GameResult(steps: Int, score: Int)
+
+  def neuralNetworkPlayer(initialDirection: Direction, model: MultiLayerNetwork): Player = new Player with NNUtilities {
+
+    private var score = 0
+    private var steps = 0
+    private var game = 1
+    private var results: List[GameResult] = List()
+
+    override var currentDirection: Direction = _
+
+    override def chooseDirection(currentState: CurrentState): Direction = {
+      score = currentState.score
+      steps += 1
+      val observation = genCurrentObservation(currentState.snake, currentState.food)
+      val input = observation.features
+
+      val predictions: immutable.Seq[(Int, Double)] = for (action <- -1 to 1) yield
+        (action, model.output(Nd4j.create(Array(input.data :+ action.toDouble)), false).getDouble(0))
+
+      val newDir = if (steps < 200) {
+        if (!observation.barrierFront && !observation.barrierLeft && !observation.barrierRight) {
+          if (genCurrentObservation(currentState.snake, currentState.food).angle == 0.0) getGameAction(currentState.snake, 0)
+          else if (genCurrentObservation(currentState.snake, currentState.food).angle < 0.0) getGameAction(currentState.snake, -1)
+          else getGameAction(currentState.snake, 1)
+        } else {
+          val superPredictions = {
+            val a = if (observation.barrierFront) predictions.filterNot(_._2 == 0.0) else predictions
+            val b = if (observation.barrierRight) a.filterNot(_._2 == 1.0) else a
+            val c = if (observation.barrierLeft) b.filterNot(_._2 == -1.0) else b
+
+            if (c.isEmpty) List((1, 1.0)) else c
+          }
+
+          getGameAction(currentState.snake, superPredictions.maxBy(_._2)._1)
+        }
+      } else {
+        UP
+      }
+
+      newDir
+    }
+
+    override def onKeyPressed(event: KeyEvent): Unit = ()
+
+    override def gameFinished(currentState: CurrentState): Boolean = {
+      results ++= List(GameResult(steps, score))
+      game += 1
+      score = 0
+      steps = 0
+      currentDirection = initialDirection
+
+      val isFinished = game > 100
+
+      if (isFinished) {
+        val avgSteps = results.map(_.steps).sum / results.size
+        val avgScore = results.map(_.score).sum / results.size
+        val bestScore = results.maxBy(_.score)
+        val highestSteps = results.maxBy(_.steps)
+        println(s"Results:" +
+          s"Games: $game" +
+          s"Avg Steps: $avgSteps\n" +
+          s"Avg Score: $avgScore\n" +
+          s"Best Score: ${bestScore.score} achieved with ${bestScore.steps} steps\n" +
+          s"Highest Steps: ${highestSteps.steps} achieved with ${highestSteps.score} score")
+      }
+
+      !isFinished
     }
   }
 }
-
-// potrzebuje zmieniac aktualny kierunek i bedzie sie o to odpytywal snake animation

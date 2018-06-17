@@ -1,54 +1,70 @@
+import breeze.linalg.DenseVector
+import cats.data.NonEmptyList
 import config._
 import javafx.animation.KeyFrame
 import javafx.application.Application
 import javafx.collections.ObservableList
+import javafx.event.{ActionEvent, EventHandler}
+import javafx.scene._
 import javafx.scene.layout.Pane
 import javafx.scene.paint.Color
 import javafx.scene.shape.Rectangle
 import javafx.scene.text.{Font, Text}
-import javafx.scene.{Group, Node, Parent, Scene}
 import javafx.stage.Stage
 import javafx.util.Duration
+import org.deeplearning4j.nn.multilayer.MultiLayerNetwork
 import scalafx.animation.Timeline
 
-class SnakeAnimation extends Application {
+import scala.collection.JavaConverters._
+
+class SnakeAnimation extends Application with SnakeGame with NNUtilities {
 
   val timeline = new Timeline()
-
   var snake: ObservableList[Node] = _
-  var isMoving = false
   var isRunning = false
-  var currentDirection: Direction = RIGHT
   var score = 0
 
-  def generateFood(food: Rectangle, snake: ObservableList[Node]): Unit = {
-    var correctPos = false
+  def snakeAsVector(snake: ObservableList[Node]): NonEmptyList[DenseVector[Double]] = {
+    val head :: tail = snake.asScala.toList
 
-    val snakePositions: List[(Double, Double)] = {
-      var list = List[(Double, Double)]()
-      snake.forEach { rect =>
-        list :+= (rect.getTranslateX, rect.getTranslateY)
-      }
-      list
-    }
-
-    while (!correctPos) {
-      val newX = (Math.random() * (BOARD_WIDTH - BLOCK_SIZE)).toInt / BLOCK_SIZE * BLOCK_SIZE
-      val newY = (Math.random() * (BOARD_HEIGHT - BLOCK_SIZE)).toInt / BLOCK_SIZE * BLOCK_SIZE
-      if (!snakePositions.contains((newX, newY))) {
-        correctPos = true
-        food.setTranslateX(newX)
-        food.setTranslateY(newY)
-      }
-    }
+    NonEmptyList(head, tail).map(node => DenseVector(node.getTranslateX, node.getTranslateY))
   }
 
-  def createContent(): Parent = {
+  def nodeAsVector(node: Node): DenseVector[Double] =
+    DenseVector(node.getTranslateX, node.getTranslateY)
+
+  def generateFood(food: Rectangle, snake: ObservableList[Node]): Unit = {
+    val vectorSnake = snakeAsVector(snake)
+    val newFood = generateFood(vectorSnake)
+
+    food.setTranslateX(newFood(0))
+    food.setTranslateY(newFood(1))
+  }
+
+  def describeCurrentState(food: Node): CurrentState = {
+    val vectorSnake = snakeAsVector(snake)
+    val foodAsVector = nodeAsVector(food)
+    describeCurrentState(isRunning, score, foodAsVector, vectorSnake)
+  }
+
+  def createContent(player: Player): Parent = {
     val root = new Pane()
     root.setPrefSize(BOARD_WIDTH, BOARD_HEIGHT)
 
     val snakeBody = new Group()
     snake = snakeBody.getChildren
+    if (snake.size() < 1) {
+      val genX = (Math.random() * (BOARD_WIDTH - BLOCK_SIZE)).toInt / BLOCK_SIZE * BLOCK_SIZE
+      val genY = (Math.random() * (BOARD_HEIGHT - BLOCK_SIZE)).toInt / BLOCK_SIZE * BLOCK_SIZE
+      val head = new Rectangle(BLOCK_SIZE, BLOCK_SIZE)
+      val tail = new Rectangle(BLOCK_SIZE, BLOCK_SIZE)
+      head.setTranslateX(genX)
+      head.setTranslateY(genY)
+      tail.setTranslateX(genX + BLOCK_SIZE)
+      tail.setTranslateY(genY)
+      snake.add(head)
+      snake.add(tail)
+    }
 
     val food = new Rectangle(BLOCK_SIZE, BLOCK_SIZE)
     food.setFill(Color.BLUE)
@@ -60,56 +76,37 @@ class SnakeAnimation extends Application {
     text.setX(BOARD_WIDTH - 5 * BLOCK_SIZE)
     text.setY(BOARD_HEIGHT - BLOCK_SIZE)
 
-    val frame = new KeyFrame(Duration.seconds(0.2), _ => {
-      if (isRunning) {
-        text.setText(s"Score: $score")
+    val frame = new KeyFrame(Duration.seconds(0.05), new EventHandler[ActionEvent] {
+      override def handle(event: ActionEvent): Unit = {
+        if (isRunning) {
+          text.setText(s"Score: $score")
+          val newDirection = player.chooseDirection(describeCurrentState(food))
+          val tail = snake.remove(snake.size() - 1)
 
-        val toRemove = snake.size() > 1
-        val tail = if (toRemove) snake.remove(snake.size() - 1) else snake.get(0) // last element
+          newDirection match {
+            case UP =>
+              tail.setTranslateX(snake.get(0).getTranslateX)
+              tail.setTranslateY(snake.get(0).getTranslateY - BLOCK_SIZE)
+            case DOWN =>
+              tail.setTranslateX(snake.get(0).getTranslateX)
+              tail.setTranslateY(snake.get(0).getTranslateY + BLOCK_SIZE)
+            case LEFT =>
+              tail.setTranslateX(snake.get(0).getTranslateX - BLOCK_SIZE)
+              tail.setTranslateY(snake.get(0).getTranslateY)
+            case RIGHT =>
+              tail.setTranslateX(snake.get(0).getTranslateX + BLOCK_SIZE)
+              tail.setTranslateY(snake.get(0).getTranslateY)
+          }
 
-        // at every iteration I go with currentDirection
-        // maybe I could ask for direction instead? ;)
-        currentDirection match {
-          case UP =>
-            tail.setTranslateX(snake.get(0).getTranslateX)
-            tail.setTranslateY(snake.get(0).getTranslateY - BLOCK_SIZE)
-          case DOWN =>
-            tail.setTranslateX(snake.get(0).getTranslateX)
-            tail.setTranslateY(snake.get(0).getTranslateY + BLOCK_SIZE)
-          case LEFT =>
-            tail.setTranslateX(snake.get(0).getTranslateX - BLOCK_SIZE)
-            tail.setTranslateY(snake.get(0).getTranslateY)
-          case RIGHT =>
-            tail.setTranslateX(snake.get(0).getTranslateX + BLOCK_SIZE)
-            tail.setTranslateY(snake.get(0).getTranslateY)
+          snake.add(0, tail)
+
+          if (detectCollision()) stopGame(player, food)
+          else if (detectFood(tail, food)) {
+            expandSnake(tail.getTranslateX, tail.getTranslateY)
+            generateFood(food, snake)
+          }
         }
-
-        //        isMoving = true
-
-        if (toRemove)
-          snake.add(0, tail) // transfering tail to the front ???
-
-        if (detectCollision(tail)) restartGame()
-        else if (detectFood(tail, food)) {
-          expandSnake(tail.getTranslateX, tail.getTranslateY)
-          generateFood(food, snake)
-        }
-
-        //        if (isMoving) {
-        //          val r = (Math.random() * 100).toInt % 4
-        //          println(r)
-        //
-        //          r match {
-        //            case 0 if currentDirection != DOWN => currentDirection = UP
-        //            case 1 if currentDirection != UP => currentDirection = DOWN
-        //            case 2 if currentDirection != RIGHT => currentDirection = LEFT
-        //            case 3 if currentDirection != LEFT => currentDirection = RIGHT
-        //            case _ =>
-        //
-        //          }
-        //          isMoving = false
-        //        }
-      } // return ?
+      }
     })
 
     timeline.getKeyFrames.add(frame)
@@ -120,77 +117,65 @@ class SnakeAnimation extends Application {
     root
   }
 
-  def detectCollision(tail: Node): Boolean = {
-    import scala.collection.JavaConverters._
-    val tailX = tail.getTranslateX
-    val tailY = tail.getTranslateY
-
-    tailX < 0 ||
-      tailX >= BOARD_WIDTH ||
-      tailY < 0 ||
-      tailY >= BOARD_HEIGHT ||
-      snake.asScala.foldLeft(false) { case (detected, node) =>
-        detected || (node != tail && tailX == node.getTranslateX && tailY == node.getTranslateY)
-      }
-  }
+  def detectCollision(): Boolean =
+    detectCollision(snakeAsVector(snake))
 
   def detectFood(tail: Node, food: Rectangle): Boolean =
     tail.getTranslateX == food.getTranslateX && tail.getTranslateY == food.getTranslateY
 
-  def expandSnake(tailX: Double, tailY: Double): Boolean = {
+  def expandSnake(newTailX: Double, newTailY: Double): Unit = {
     score += 1
+
     val rect = new Rectangle(BLOCK_SIZE, BLOCK_SIZE)
-    rect.setTranslateX(tailX)
-    rect.setTranslateY(tailY)
+    rect.setTranslateX(newTailX)
+    rect.setTranslateY(newTailY)
 
     snake.add(rect)
   }
 
-  def restartGame() {
-    stopGame()
-    startGame()
-  }
-
-  def stopGame() {
+  def stopGame(player: Player, food: Rectangle) {
     isRunning = false
+    val lastState = describeCurrentState(food)
     timeline.stop()
+    generateFood(food, snake)
     snake.clear()
+    if (player.gameFinished(lastState))
+      startGame(player)
   }
 
-  def startGame() {
+  def startGame(player: Player) {
     score = 0
-    currentDirection = RIGHT
-    val head = new Rectangle(BLOCK_SIZE, BLOCK_SIZE)
-    snake.add(head)
+    if (snake.size() < 1) {
+      val genX = (Math.random() * (BOARD_WIDTH - BLOCK_SIZE)).toInt / BLOCK_SIZE * BLOCK_SIZE
+      val genY = (Math.random() * (BOARD_HEIGHT - BLOCK_SIZE)).toInt / BLOCK_SIZE * BLOCK_SIZE
+      val head = new Rectangle(BLOCK_SIZE, BLOCK_SIZE)
+      val tail = new Rectangle(BLOCK_SIZE, BLOCK_SIZE)
+      head.setTranslateX(genX)
+      head.setTranslateY(genY)
+      tail.setTranslateX(genX + BLOCK_SIZE)
+      tail.setTranslateY(genY)
+      snake.add(head)
+      snake.add(tail)
+    }
     timeline.play()
     isRunning = true
   }
 
   override def start(primaryStage: Stage) {
-    import javafx.scene.input.KeyCode.{A, D, S, W}
+    val training = new SnakeTrainingFacility()
+    val trainedNetwork: MultiLayerNetwork = training.model(training.initialPopulation(10000))
+    val player = Player.neuralNetworkPlayer(RIGHT, trainedNetwork)
 
-    val scene = new Scene(createContent())
-    // todo: zwracanie pozycji jedzenia, score'u i snake'a
-    // to mozna zamockowac na własną grę, randomową, przez sieć
-    // make gui optional
+//    val player = Player.humanPlayer(RIGHT)
+    val scene = new Scene(createContent(player))
 
-    scene.setOnKeyPressed(event => {
-      //      if (isMoving) {
-      event.getCode match {
-        case W if currentDirection != DOWN => currentDirection = UP
-        case S if currentDirection != UP => currentDirection = DOWN
-        case A if currentDirection != RIGHT => currentDirection = LEFT
-        case D if currentDirection != LEFT => currentDirection = RIGHT
-        case _ =>
-
-        //        }
-        //        isMoving = false
-      }
+    scene.setOnKeyPressed(new EventHandler[input.KeyEvent] {
+      override def handle(event: input.KeyEvent): Unit = player.onKeyPressed(event)
     })
 
     primaryStage.setTitle("Snake Game - Piotr Gawryś")
     primaryStage.setScene(scene)
     primaryStage.show()
-    startGame()
+    startGame(player)
   }
 }
