@@ -1,4 +1,4 @@
-package neuralnetwork
+package neuralnetwork.lab1
 
 import breeze.linalg.{DenseMatrix, DenseVector, _}
 

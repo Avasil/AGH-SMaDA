@@ -1,4 +1,4 @@
-package neuralnetwork
+package neuralnetwork.lab1
 
 import breeze.linalg.{DenseMatrix, DenseVector}
 
@@ -17,8 +17,8 @@ final case class PropagatedLayer(
                                   activationFunc: ActivationSpec
                                 ) extends PropagatedLayerSpec {
 
-  def validateResult(target: DenseVector[Double]) = {
-    isCorrect(output, target)
+  def validateResult(label: DenseVector[Double])(p: (DenseVector[Double], DenseVector[Double]) => Boolean): Boolean = {
+    p(output, label)
   }
 }
 

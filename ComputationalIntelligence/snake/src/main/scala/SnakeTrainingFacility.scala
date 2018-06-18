@@ -25,12 +25,10 @@ class SnakeTrainingFacility extends SnakeGame with NNUtilities {
   var score = 0
   val learningRate = 0.01
 
-  def tensorFlowModel(trainingData: List[TrainingResult]) = {
-//    val features = trainingData.toArray.map(d => d.previousObservation.features.data :+ d.action.toDouble)
-//    val labels = trainingData.toArray.map(_.reward.toDouble)
 
-    val features: Array[Array[Double]] = ???
-    val labels: Array[Double] = ???
+  def tensorFlowModel(trainingData: List[TrainingResult]) = {
+    val features = trainingData.toArray.map(d => d.previousObservation.features.data :+ d.action.toDouble)
+    val labels = trainingData.toArray.map(_.reward.toDouble)
 
     val featuresTensor = Tensor(features.head, features.tail: _*)
     val labelsTensor = Tensor(labels.head, labels.tail: _*)
@@ -46,8 +44,8 @@ class SnakeTrainingFacility extends SnakeGame with NNUtilities {
         .prefetch(10)
 
     // Create the MLP model.
-    val input = Input(UINT8, Shape(-1, 5, 1))
-    val trainInput = Input(UINT8, Shape(-1))
+    val input = Input(FLOAT64, Shape(-1, 5, 1))
+    val trainInput = Input(FLOAT64, Shape(-1))
 
     val layer = tf.learn.Flatten("Input/Flatten") >>
       tf.learn.Cast("Input/Cast", FLOAT64) >>
@@ -55,7 +53,8 @@ class SnakeTrainingFacility extends SnakeGame with NNUtilities {
       tf.learn.Linear("OutputLayer/Linear", 1)
 
     val trainingInputLayer = Cast("TrainInput/Cast", FLOAT64)
-    val loss = SparseSoftmaxCrossEntropy("Loss/CrossEntropy") >> tf.learn.Mean("Loss/Mean")
+    val loss = SparseSoftmaxCrossEntropy("Loss/CrossEntropy") >>
+      tf.learn.Mean("Loss/Mean") >> tf.learn.ScalarSummary("Loss/Summary", "Loss")
     val optimizer = tf.train.Adam(learningRate)
     val model = Model.supervised(input, layer, trainInput, trainingInputLayer, loss, optimizer)
 
@@ -63,9 +62,7 @@ class SnakeTrainingFacility extends SnakeGame with NNUtilities {
     val estimator = InMemoryEstimator(model)
     estimator.train(() => trainData, StopCriteria(maxSteps = Some(1000000)))
 
-    val prediction = estimator.infer(() => Tensor(features.head))
-
-    prediction.cast(FLOAT64).scalar.asInstanceOf[Double]
+    estimator
   }
 
   def model(trainingData: List[TrainingResult]): MultiLayerNetwork = {

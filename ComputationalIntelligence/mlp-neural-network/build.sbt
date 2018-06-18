@@ -2,7 +2,7 @@ name := "mlp-neural-network"
 
 version := "0.1"
 
-scalaVersion := "2.12.4"
+scalaVersion := "2.11.11"
 
 val breezeVersion = "0.13.2"
 
@@ -17,3 +17,5 @@ val fp = Seq(
 )
 
 libraryDependencies  ++= breeze ++ fp
+
+libraryDependencies += "org.scalafx" %% "scalafx" % "8.0.144-R12"

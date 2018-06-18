@@ -1,8 +1,10 @@
+package neuralnetwork.snake
+
+import breeze.linalg.DenseVector
 import cats.implicits._
 import javafx.scene.input.KeyCode.{A, D, S, W}
 import javafx.scene.input.KeyEvent
-import org.deeplearning4j.nn.multilayer.MultiLayerNetwork
-import org.nd4j.linalg.factory.Nd4j
+import neuralnetwork.lab1.{BackpropNet, SnakeNN}
 
 import scala.collection.immutable
 
@@ -46,7 +48,7 @@ object Player {
 
   final case class GameResult(steps: Int, score: Int)
 
-  def neuralNetworkPlayer(initialDirection: Direction, model: MultiLayerNetwork): Player = new Player with NNUtilities {
+  def neuralNetworkPlayer(initialDirection: Direction, model: BackpropNet): Player = new Player with NNUtilities {
 
     private var score = 0
     private var steps = 0
@@ -62,27 +64,10 @@ object Player {
       val input = observation.features
 
       val predictions: immutable.Seq[(Int, Double)] = for (action <- -1 to 1) yield
-        (action, model.output(Nd4j.create(Array(input.data :+ action.toDouble)), false).getDouble(0))
+        (action, SnakeNN.predict(model, DenseVector(input.data :+ action.toDouble)).data(0))
 
-      val barrierFront = (observation.barrierFront, 0)
-      val barrierLeft = (observation.barrierLeft, -1)
-      val barrierRight = (observation.barrierRight, 1)
+      getGameAction(currentState.snake, predictions.maxBy(_._2)._1)
 
-      val barriers = List(barrierFront, barrierLeft, barrierRight)
-
-
-      val newDir =
-        if (barriers.count(_._1) < 1) {
-          if (genCurrentObservation(currentState.snake, currentState.food).angle == 0.0) getGameAction(currentState.snake, 0)
-          else if (genCurrentObservation(currentState.snake, currentState.food).angle < 0.0) getGameAction(currentState.snake, -1)
-          else getGameAction(currentState.snake, 1)
-        } else {
-          getGameAction(currentState.snake, scala.util.Random.shuffle(barriers.filterNot(_._1)).headOption.map(_._2).getOrElse(0))
-        }
-
-      //          getGameAction(currentState.snake, superPredictions.maxBy(_._2)._1)
-
-      newDir
     }
 
     override def onKeyPressed(event: KeyEvent): Unit = ()
