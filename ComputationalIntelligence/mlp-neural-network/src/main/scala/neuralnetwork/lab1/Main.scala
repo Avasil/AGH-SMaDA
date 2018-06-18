@@ -1,9 +1,8 @@
 package neuralnetwork.lab1
 
-import LoadingData.{InputData, loadInputs}
+import neuralnetwork.lab1.LoadingData.loadInputs
 
 object Main extends App with NNUtilities {
-  // randomize data or something
   val layers = List(
     // (n, m) = (input, output), Iris ma 4 kolumny
     // (output, input)

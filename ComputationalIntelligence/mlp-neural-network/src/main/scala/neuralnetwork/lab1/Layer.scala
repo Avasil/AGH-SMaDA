@@ -19,7 +19,7 @@ object BackpropNet {
   }
   private def checkDimensions(r1: Int, c2: Int): Int =
     if (r1 == c2) c2
-    else {println(r1);println(c2);throw new Exception("zle wymiary")}
+    else throw new Exception("zle wymiary")
 }
 
 trait ActivationSpec {

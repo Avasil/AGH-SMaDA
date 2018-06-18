@@ -167,7 +167,7 @@ class SnakeAnimation extends Application with SnakeGame with NNUtilities {
     val training = new SnakeTrainingFacility()
 
 
-    val trainingData: List[InputData] = training.initialPopulation(10000).map(d =>
+    val trainingData: List[InputData] = training.initialPopulation(1000).map(d =>
       InputData(DenseVector(d.previousObservation.features.data :+ d.action.toDouble), DenseVector(d.reward.toDouble))
     )
 

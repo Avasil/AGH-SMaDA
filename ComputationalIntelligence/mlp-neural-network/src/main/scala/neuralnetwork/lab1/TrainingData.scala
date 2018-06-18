@@ -10,8 +10,6 @@ trait TrainingData {
   def isCorrect(result: DenseVector[Double], label: DenseVector[Double]): Boolean
 
   def labelToDouble(s: String): DenseVector[Double]
-
-  def labelFroMDouble(s: DenseVector[Double]): String
 }
 
 object TrainingData {
@@ -24,7 +22,7 @@ object TrainingData {
 
     override def path: String = "src/main/resources/iris.csv"
 
-    override def labelFroMDouble(s: DenseVector[Double]): String = s.data match {
+    def labelFroMDouble(s: DenseVector[Double]): String = s.data match {
       case Array(x, y, z) if x > y && x > z => "Iris-setosa"
       case Array(x, y, z) if y > z && y > x => "Iris-versicolor"
       case _ => "Iris-virginica"
@@ -43,15 +41,18 @@ object TrainingData {
     }
   }
 
-  val wineData = new TrainingData {
-    override def labelToDouble(s: String): DenseVector[Double] = ???
+  val pokerData = new TrainingData {
+    override def labelToDouble(s: String): DenseVector[Double] = DenseVector(s.toDouble)
 
-    override def labelFroMDouble(s: DenseVector[Double]): String = ???
+    override def path: String = "src/main/resources/poker-hand-testing.csv"
 
-    override def path: String = ???
+    override def delim: String = ","
 
-    override def delim: String = ???
+    override def isCorrect(result: DenseVector[Double], label: DenseVector[Double]): Boolean = {
+      val expected = Math.round(label.data(0))
+      val predicted = Math.round(result.data(0))
 
-    override def isCorrect(result: DenseVector[Double], label: DenseVector[Double]): Boolean = ???
+      expected == predicted
+    }
   }
 }

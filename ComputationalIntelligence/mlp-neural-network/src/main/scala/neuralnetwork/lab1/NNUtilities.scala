@@ -10,7 +10,7 @@ import scala.util.Random
 trait NNUtilities {
   def train(inputs: List[InputData], layers: List[Layer], learningRate: Double): BackpropNet = {
     val initialBpNet = BackpropNet(inputs.head.features, layers = layers, learningRate = learningRate)
-    kFoldCrossValidation(10, 20, inputs, initialBpNet).trainedNet
+    kFoldCrossValidation(5, 20000, inputs, initialBpNet).trainedNet
   }
 
   def test(inputs: List[InputData], net: BackpropNet)(implicit F: TrainingData): Double = {

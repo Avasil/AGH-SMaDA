@@ -67,9 +67,7 @@ object Player {
       val barrierFront = (observation.barrierFront, 0)
       val barrierLeft = (observation.barrierLeft, -1)
       val barrierRight = (observation.barrierRight, 1)
-
       val barriers = List(barrierFront, barrierLeft, barrierRight)
-
 
       val newDir =
         if (barriers.count(_._1) < 1) {
