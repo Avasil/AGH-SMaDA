@@ -2,6 +2,7 @@ name := "mlp-neural-network"
 
 version := "0.1"
 
+
 scalaVersion := "2.11.11"
 
 val breezeVersion = "0.13.2"
