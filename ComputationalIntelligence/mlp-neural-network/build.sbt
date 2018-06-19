@@ -2,7 +2,8 @@ name := "mlp-neural-network"
 
 version := "0.1"
 
-scalaVersion := "2.12.4"
+
+scalaVersion := "2.11.11"
 
 val breezeVersion = "0.13.2"
 
@@ -13,7 +14,9 @@ val breeze = Seq(
 )
 
 val fp = Seq(
-  "org.typelevel" %% "cats-effect" % "0.10"
+  "org.typelevel" %% "cats-effect" % "1.0.0-RC2"
 )
 
 libraryDependencies  ++= breeze ++ fp
+
+libraryDependencies += "org.scalafx" %% "scalafx" % "8.0.144-R12"
