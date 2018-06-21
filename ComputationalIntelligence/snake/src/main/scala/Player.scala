@@ -64,23 +64,9 @@ object Player {
       val predictions: immutable.Seq[(Int, Double)] = for (action <- -1 to 1) yield
         (action, model.output(Nd4j.create(Array(input.data :+ action.toDouble)), false).getDouble(0))
 
-      val barrierFront = (observation.barrierFront, 0)
-      val barrierLeft = (observation.barrierLeft, -1)
-      val barrierRight = (observation.barrierRight, 1)
-      val barriers = List(barrierFront, barrierLeft, barrierRight)
 
-      val newDir =
-        if (barriers.count(_._1) < 1) {
-          if (genCurrentObservation(currentState.snake, currentState.food).angle == 0.0) getGameAction(currentState.snake, 0)
-          else if (genCurrentObservation(currentState.snake, currentState.food).angle < 0.0) getGameAction(currentState.snake, -1)
-          else getGameAction(currentState.snake, 1)
-        } else {
-          getGameAction(currentState.snake, scala.util.Random.shuffle(barriers.filterNot(_._1)).headOption.map(_._2).getOrElse(0))
-        }
+      getGameAction(currentState.snake, predictions.maxBy(_._2)._1)
 
-      //          getGameAction(currentState.snake, superPredictions.maxBy(_._2)._1)
-
-      newDir
     }
 
     override def onKeyPressed(event: KeyEvent): Unit = ()
