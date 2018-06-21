@@ -26,45 +26,6 @@ class SnakeTrainingFacility extends SnakeGame with NNUtilities {
   val learningRate = 0.01
 
 
-  def tensorFlowModel(trainingData: List[TrainingResult]) = {
-    val features = trainingData.toArray.map(d => d.previousObservation.features.data :+ d.action.toDouble)
-    val labels = trainingData.toArray.map(_.reward.toDouble)
-
-    val featuresTensor = Tensor(features.head, features.tail: _*)
-    val labelsTensor = Tensor(labels.head, labels.tail: _*)
-
-    val trainFeatures = tf.data.TensorSlicesDataset(featuresTensor)
-    val trainLabels = tf.data.TensorSlicesDataset(labelsTensor)
-
-    val trainData =
-      trainFeatures.zip(trainLabels)
-        .repeat()
-        .shuffle(10000)
-        .batch(256)
-        .prefetch(10)
-
-    // Create the MLP model.
-    val input = Input(FLOAT64, Shape(-1, 5, 1))
-    val trainInput = Input(FLOAT64, Shape(-1))
-
-    val layer = tf.learn.Flatten("Input/Flatten") >>
-      tf.learn.Cast("Input/Cast", FLOAT64) >>
-      tf.learn.Linear("Layer_0/Linear", 25) >> tf.learn.ReLU("Layer_0/ReLU", 0.1f) >>
-      tf.learn.Linear("OutputLayer/Linear", 1)
-
-    val trainingInputLayer = Cast("TrainInput/Cast", FLOAT64)
-    val loss = SparseSoftmaxCrossEntropy("Loss/CrossEntropy") >>
-      tf.learn.Mean("Loss/Mean") >> tf.learn.ScalarSummary("Loss/Summary", "Loss")
-    val optimizer = tf.train.Adam(learningRate)
-    val model = Model.supervised(input, layer, trainInput, trainingInputLayer, loss, optimizer)
-
-    // Create an estimator and train the model.
-    val estimator = InMemoryEstimator(model)
-    estimator.train(() => trainData, StopCriteria(maxSteps = Some(1000000)))
-
-    estimator
-  }
-
   def model(trainingData: List[TrainingResult]): MultiLayerNetwork = {
     val rngSeed = 1337
 

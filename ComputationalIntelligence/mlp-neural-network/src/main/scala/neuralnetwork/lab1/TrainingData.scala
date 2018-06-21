@@ -44,7 +44,7 @@ object TrainingData {
   val pokerData = new TrainingData {
     override def labelToDouble(s: String): DenseVector[Double] = DenseVector(s.toDouble)
 
-    override def path: String = "src/main/resources/poker-hand-testing.csv"
+    override def path: String = "src/main/resources/poker-hand-training-true.csv"
 
     override def delim: String = ","
 
